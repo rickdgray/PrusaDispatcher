@@ -1,6 +1,8 @@
 ﻿using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using System.Net;
+using System.Net.Http.Json;
 
 namespace PrusaPushDispatcher
 {
@@ -16,7 +18,7 @@ namespace PrusaPushDispatcher
             _logger = logger;
         }
 
-        protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+        protected override async Task ExecuteAsync(CancellationToken cancellationToken)
         {
             _logger.LogInformation("Starting application.");
 
@@ -30,47 +32,72 @@ namespace PrusaPushDispatcher
                 throw new ArgumentNullException("PushoverAppKey", "The app key was not specified!");
             }
 
-            using var client = new HttpClient();
+            // as per new httpclient guidelines and updated digest auth for .NET 6+
+            // https://learn.microsoft.com/en-us/dotnet/fundamentals/networking/http/httpclient-guidelines
+            // https://github.com/CallumHoughton18/csharp-dotnet-digest-authentication/issues/1
+            using var printerClient = new HttpClient(new SocketsHttpHandler
+            {
+                PooledConnectionLifetime = TimeSpan.FromMinutes(5),
+                Credentials = new NetworkCredential(_settings.PrinterUsername, _settings.PrinterApiKey)
+            });
+
+            using var pushoverClient = new HttpClient();
 
             var lastPoll = DateTimeOffset.Now;
-            var status = PrinterStatus.Unknown;
+            var lastPrinterStatus = PrinterStatus.Unknown;
 
-            while (!stoppingToken.IsCancellationRequested)
+            while (!cancellationToken.IsCancellationRequested)
             {
                 _logger.LogInformation("Polling Printer.");
 
-                var printerStatusResponse = await client.GetAsync(_settings.PrinterUrl, stoppingToken);
-                if (printerStatusResponse != null)
+                var printerStatus = await printerClient.GetFromJsonAsync<PrinterStatus>(_settings.PrinterUrl, cancellationToken);
+
+                if (printerStatus == null)
                 {
-                    var printerStatus = await printerStatusResponse.Content.ReadAsStringAsync();
-                    if (printerStatus != null)
-                    {
-                        //TODO: handle json
+                    _logger.LogInformation("Printer not responding.");
 
-                        _logger.LogInformation("Found new printer status: {status}.", status);
-
-                        var notification = new Dictionary<string, string>
+                    var notification = new Dictionary<string, string>
                     {
                         { "token", _settings.PushoverAppKey },
                         { "user", _settings.PushoverUserKey },
                         { "title", "Printer Status" },
-                        { "message", $"Printer status is now: {status}" }
+                        { "message", "Printer not responding." }
                     };
 
-                        await client.PostAsync(
-                                "https://api.pushover.net/1/messages.json",
-                                new FormUrlEncodedContent(notification),
-                                stoppingToken);
+                    await pushoverClient.PostAsync(
+                        "https://api.pushover.net/1/messages.json",
+                        new FormUrlEncodedContent(notification),
+                        cancellationToken);
 
-                        _logger.LogInformation("Notification pushed.");
-                    }
+                    _logger.LogInformation("Notification pushed.");
+                }
+                else if (printerStatus != lastPrinterStatus)
+                {
+                    _logger.LogInformation("Found new printer status: {status}.", printerStatus);
+
+                    var notification = new Dictionary<string, string>
+                    {
+                        { "token", _settings.PushoverAppKey },
+                        { "user", _settings.PushoverUserKey },
+                        { "title", "Printer Status" },
+                        { "message", $"Printer status is now: {printerStatus}" }
+                    };
+
+                    await pushoverClient.PostAsync(
+                        "https://api.pushover.net/1/messages.json",
+                        new FormUrlEncodedContent(notification),
+                        cancellationToken);
+
+                    _logger.LogInformation("Notification pushed.");
+
+                    lastPrinterStatus = printerStatus;
                 }
 
                 _logger.LogDebug("Waiting until next poll time: {pollTime}",
-                    DateTimeOffset.Now.AddMinutes(_settings.PollRateInMinutes));
+                    DateTimeOffset.Now.AddMinutes(_settings.PollRateInSeconds));
 
                 lastPoll = DateTimeOffset.Now;
-                await Task.Delay(_settings.PollRateInMinutes * 60000, stoppingToken);
+                await Task.Delay(_settings.PollRateInSeconds, cancellationToken);
             }
         }
     }

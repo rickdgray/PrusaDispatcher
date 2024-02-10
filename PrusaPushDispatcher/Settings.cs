@@ -7,6 +7,6 @@
         public string PrinterUsername {  get; set; } = string.Empty;
         public string PrinterApiKey { get; set; } = string.Empty;
         public string PrinterUrl {  get; set; } = string.Empty;
-        public int PollRateInMinutes { get; set; }
+        public int PollRateInSeconds { get; set; }
     }
 }
