@@ -7,31 +7,15 @@ using System.Net.Http.Json;
 
 namespace PrusaPushDispatcher
 {
-    internal class PrusaPushDispatcher : BackgroundService
+    internal class PrusaPushDispatcher(IOptions<Settings> settings,
+        ILogger<PrusaPushDispatcher> logger) : BackgroundService
     {
-        private readonly Settings _settings;
-        private readonly ILogger<PrusaPushDispatcher> _logger;
-
-        public PrusaPushDispatcher(IOptions<Settings> settings,
-            ILogger<PrusaPushDispatcher> logger)
-        {
-            _settings = settings.Value;
-            _logger = logger;
-        }
+        private readonly Settings _settings = settings.Value;
+        private readonly ILogger<PrusaPushDispatcher> _logger = logger;
 
         protected override async Task ExecuteAsync(CancellationToken cancellationToken)
         {
             _logger.LogInformation("Starting application.");
-
-            if (string.IsNullOrWhiteSpace(_settings.PushoverUserKey))
-            {
-                throw new ArgumentNullException("PushoverUserKey", "The user key was not specified!");
-            }
-
-            if (string.IsNullOrWhiteSpace(_settings.PushoverAppKey))
-            {
-                throw new ArgumentNullException("PushoverAppKey", "The app key was not specified!");
-            }
 
             // as per new httpclient guidelines and updated digest auth for .NET 6+
             // https://learn.microsoft.com/en-us/dotnet/fundamentals/networking/http/httpclient-guidelines
@@ -51,7 +35,8 @@ namespace PrusaPushDispatcher
             {
                 _logger.LogInformation("Polling Printer.");
 
-                var printerStatus = await printerClient.GetFromJsonAsync<PrinterInfo>(_settings.PrinterUrl, cancellationToken);
+                // TODO: better url builder
+                var printerStatus = await printerClient.GetFromJsonAsync<PrinterInfo>($"{_settings.PrinterUrl}/api/v1/status", cancellationToken);
 
                 if (printerStatus == null)
                 {

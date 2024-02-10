@@ -53,7 +53,7 @@
 
             var item = obj as PrinterStatus;
 
-            if (item == null)
+            if (item == (PrinterStatus)null)
             {
                 return false;
             }
