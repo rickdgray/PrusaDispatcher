@@ -1,6 +1,7 @@
 ﻿using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using PrusaPushDispatcher.Models;
 using System.Net;
 using System.Net.Http.Json;
 
@@ -50,7 +51,7 @@ namespace PrusaPushDispatcher
             {
                 _logger.LogInformation("Polling Printer.");
 
-                var printerStatus = await printerClient.GetFromJsonAsync<PrinterStatus>(_settings.PrinterUrl, cancellationToken);
+                var printerStatus = await printerClient.GetFromJsonAsync<PrinterInfo>(_settings.PrinterUrl, cancellationToken);
 
                 if (printerStatus == null)
                 {
@@ -71,7 +72,7 @@ namespace PrusaPushDispatcher
 
                     _logger.LogInformation("Notification pushed.");
                 }
-                else if (printerStatus != lastPrinterStatus)
+                else if (printerStatus.Printer.State != lastPrinterStatus)
                 {
                     _logger.LogInformation("Found new printer status: {status}.", printerStatus);
 
@@ -90,7 +91,7 @@ namespace PrusaPushDispatcher
 
                     _logger.LogInformation("Notification pushed.");
 
-                    lastPrinterStatus = printerStatus;
+                    lastPrinterStatus = PrinterStatus.FromValue(printerStatus.Printer.State);
                 }
 
                 _logger.LogDebug("Waiting until next poll time: {pollTime}",
