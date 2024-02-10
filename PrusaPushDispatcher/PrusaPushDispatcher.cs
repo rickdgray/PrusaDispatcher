@@ -29,24 +29,26 @@ namespace PrusaPushDispatcher
             using var pushoverClient = new HttpClient();
 
             var lastPoll = DateTimeOffset.Now;
-            var lastPrinterStatus = PrinterStatus.Unknown;
+            var lastPrinterState = "IDLE";
 
             while (!cancellationToken.IsCancellationRequested)
             {
                 _logger.LogInformation("Polling Printer.");
 
                 // TODO: better url builder
-                var printerStatus = await printerClient.GetFromJsonAsync<PrinterInfo>($"{_settings.PrinterUrl}/api/v1/status", cancellationToken);
+                var printerStatus = await printerClient.GetFromJsonAsync<PrinterStatus>($"{_settings.PrinterUrl}/api/v1/status", cancellationToken);
 
                 if (printerStatus == null)
                 {
                     _logger.LogInformation("Printer not responding.");
 
+                    lastPrinterState = "UNRESPONSIVE";
+
                     var notification = new Dictionary<string, string>
                     {
                         { "token", _settings.PushoverAppKey },
                         { "user", _settings.PushoverUserKey },
-                        { "title", "Printer Status" },
+                        { "title", "Printer State" },
                         { "message", "Printer not responding." }
                     };
 
@@ -57,16 +59,16 @@ namespace PrusaPushDispatcher
 
                     _logger.LogInformation("Notification pushed.");
                 }
-                else if (printerStatus.Printer.State != lastPrinterStatus)
+                else if (printerStatus.Printer.State != lastPrinterState)
                 {
-                    _logger.LogInformation("Found new printer status: {status}.", printerStatus);
+                    _logger.LogInformation("Found new printer status: {status}.", printerStatus.Printer.State);
 
                     var notification = new Dictionary<string, string>
                     {
                         { "token", _settings.PushoverAppKey },
                         { "user", _settings.PushoverUserKey },
-                        { "title", "Printer Status" },
-                        { "message", $"Printer status is now: {printerStatus}" }
+                        { "title", "Printer State" },
+                        { "message", $"Printer state is now: {printerStatus.Printer.State}" }
                     };
 
                     await pushoverClient.PostAsync(
@@ -76,7 +78,7 @@ namespace PrusaPushDispatcher
 
                     _logger.LogInformation("Notification pushed.");
 
-                    lastPrinterStatus = PrinterStatus.FromValue(printerStatus.Printer.State);
+                    lastPrinterState = printerStatus.Printer.State;
                 }
 
                 _logger.LogDebug("Waiting until next poll time: {pollTime}",
