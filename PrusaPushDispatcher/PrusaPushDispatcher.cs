@@ -39,13 +39,17 @@ namespace PrusaPushDispatcher
             {
                 _logger.LogInformation("Polling Printer.");
 
-                // check
-
-                if (true)
+                var printerStatusResponse = await client.GetAsync(_settings.PrinterUrl, stoppingToken);
+                if (printerStatusResponse != null)
                 {
-                    _logger.LogInformation("Found new printer status: {status}.", status);
+                    var printerStatus = await printerStatusResponse.Content.ReadAsStringAsync();
+                    if (printerStatus != null)
+                    {
+                        //TODO: handle json
 
-                    var notification = new Dictionary<string, string>
+                        _logger.LogInformation("Found new printer status: {status}.", status);
+
+                        var notification = new Dictionary<string, string>
                     {
                         { "token", _settings.PushoverAppKey },
                         { "user", _settings.PushoverUserKey },
@@ -53,12 +57,13 @@ namespace PrusaPushDispatcher
                         { "message", $"Printer status is now: {status}" }
                     };
 
-                    await client.PostAsync(
-                            "https://api.pushover.net/1/messages.json",
-                            new FormUrlEncodedContent(notification),
-                            stoppingToken);
+                        await client.PostAsync(
+                                "https://api.pushover.net/1/messages.json",
+                                new FormUrlEncodedContent(notification),
+                                stoppingToken);
 
-                    _logger.LogInformation("Notification pushed.");
+                        _logger.LogInformation("Notification pushed.");
+                    }
                 }
 
                 _logger.LogDebug("Waiting until next poll time: {pollTime}",
