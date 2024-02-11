@@ -33,7 +33,7 @@ namespace PrusaPushDispatcher
 
             while (!cancellationToken.IsCancellationRequested)
             {
-                _logger.LogInformation("Polling Printer.");
+                _logger.LogDebug("Polling Printer.");
 
                 // TODO: better url builder
                 var printerStatus = await printerClient.GetFromJsonAsync<PrinterStatus>($"{_settings.PrinterUrl}/api/v1/status", cancellationToken);
