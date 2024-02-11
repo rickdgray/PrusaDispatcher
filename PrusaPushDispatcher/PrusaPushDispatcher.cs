@@ -63,11 +63,12 @@ namespace PrusaPushDispatcher
                 {
                     _logger.LogInformation("Found new printer status: {status}.", printerStatus.Printer.State);
 
+                    // TODO: customizable notification text
                     var notification = new Dictionary<string, string>
                     {
                         { "token", _settings.PushoverAppKey },
                         { "user", _settings.PushoverUserKey },
-                        { "title", "Printer State" },
+                        { "title", "Prusa MK4" },
                         { "message", $"Printer state is now: {printerStatus.Printer.State}" }
                     };
 
