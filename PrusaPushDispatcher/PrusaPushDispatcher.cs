@@ -81,9 +81,6 @@ namespace PrusaPushDispatcher
                     lastPrinterState = printerStatus.Printer.State;
                 }
 
-                _logger.LogDebug("Waiting until next poll time: {pollTime}",
-                    DateTimeOffset.Now.AddMinutes(_settings.PollRateInSeconds));
-
                 lastPoll = DateTimeOffset.Now;
                 await Task.Delay(_settings.PollRateInSeconds, cancellationToken);
             }
