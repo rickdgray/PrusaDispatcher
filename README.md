@@ -30,3 +30,20 @@ Projects in .NET have an unusual folder structure, so when building we must both
 ```bash
 docker build -f .\PrusaPushDispatcher\Dockerfile .
 ```
+
+## Debugging
+You can edit the `launchSettings.json` file with your secrets. Then set the startup dropdown to "Docker" so that Visual Studio will create a container. This will allow you to debug with a local container.
+```json
+{
+  "profiles": {
+    "Docker": {
+      "commandName": "Docker",
+      "environmentVariables": {
+        "Settings__PushoverUserKey": "abcd1234",
+        "Settings__PushoverAppKey": "abcd1234",
+        "Settings__PrinterApiKey": "abcd1234"
+      }
+    }
+  }
+}
+```

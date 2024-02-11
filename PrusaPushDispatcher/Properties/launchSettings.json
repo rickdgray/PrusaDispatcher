@@ -1,0 +1,15 @@
+{
+  "profiles": {
+    "PrusaPushDispatcher": {
+      "commandName": "Project"
+    },
+    "Docker": {
+      "commandName": "Docker",
+      "environmentVariables": {
+        "Settings__PushoverUserKey": "abcd1234",
+        "Settings__PushoverAppKey": "abcd1234",
+        "Settings__PrinterApiKey": "abcd1234"
+      }
+    }
+  }
+}
