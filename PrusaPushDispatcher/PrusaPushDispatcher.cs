@@ -82,7 +82,7 @@ namespace PrusaPushDispatcher
                 }
 
                 lastPoll = DateTimeOffset.Now;
-                await Task.Delay(_settings.PollRateInSeconds, cancellationToken);
+                await Task.Delay(_settings.PollRateInSeconds * 1000, cancellationToken);
             }
         }
     }
