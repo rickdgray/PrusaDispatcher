@@ -10,6 +10,13 @@ namespace PrusaPushDispatcher
     internal class PrusaPushDispatcher(IOptions<Settings> settings,
         ILogger<PrusaPushDispatcher> logger) : BackgroundService
     {
+        // All statuses:
+        // "IDLE", "BUSY", "PRINTING", "PAUSED", "FINISHED", "STOPPED", "ERROR", "ATTENTION", "READY"
+        private static readonly List<string> PrinterStateWhitelist =
+        [
+            "BUSY", "FINISHED", "ERROR", "ATTENTION"
+        ];
+
         private readonly Settings _settings = settings.Value;
         private readonly ILogger<PrusaPushDispatcher> _logger = logger;
 
@@ -30,15 +37,26 @@ namespace PrusaPushDispatcher
 
             var lastPoll = DateTimeOffset.Now;
             var lastPrinterState = "IDLE";
+            var failCount = 0;
 
             while (!cancellationToken.IsCancellationRequested)
             {
                 _logger.LogDebug("Polling Printer.");
 
-                // TODO: better url builder
-                var printerStatus = await printerClient.GetFromJsonAsync<PrinterStatus>($"{_settings.PrinterUrl}/api/v1/status", cancellationToken);
+                PrinterStatus? printerStatus = null;
 
-                if (printerStatus == null)
+                try
+                {
+                    // TODO: better url builder
+                    printerStatus = await printerClient.GetFromJsonAsync<PrinterStatus>($"{_settings.PrinterUrl}/api/v1/status", cancellationToken);
+                }
+                catch (HttpRequestException)
+                {
+                    failCount++;
+                }
+
+                // at 10 fails, report unresponsive, but don't keep spamming after 10 fails.
+                if (printerStatus == null && failCount == 10)
                 {
                     _logger.LogInformation("Printer not responding.");
 
@@ -59,25 +77,34 @@ namespace PrusaPushDispatcher
 
                     _logger.LogInformation("Notification pushed.");
                 }
-                else if (printerStatus.Printer.State != lastPrinterState)
+                
+                // tell me if status changed
+                if (printerStatus != null && printerStatus.Printer.State != lastPrinterState)
                 {
-                    _logger.LogInformation("Found new printer status: {status}.", printerStatus.Printer.State);
+                    _logger.LogInformation("Found new printer state: {state}.", printerStatus.Printer.State);
 
-                    // TODO: customizable notification text
-                    var notification = new Dictionary<string, string>
+                    if (PrinterStateWhitelist.Contains(printerStatus.Printer.State))
                     {
-                        { "token", _settings.PushoverAppKey },
-                        { "user", _settings.PushoverUserKey },
-                        { "title", "Prusa MK4" },
-                        { "message", $"Printer state is now: {printerStatus.Printer.State}" }
-                    };
+                        // TODO: customizable notification text
+                        var notification = new Dictionary<string, string>
+                        {
+                            { "token", _settings.PushoverAppKey },
+                            { "user", _settings.PushoverUserKey },
+                            { "title", "Prusa MK4" },
+                            { "message", $"Printer state is now: {printerStatus.Printer.State}" }
+                        };
 
-                    await pushoverClient.PostAsync(
-                        "https://api.pushover.net/1/messages.json",
-                        new FormUrlEncodedContent(notification),
-                        cancellationToken);
+                        await pushoverClient.PostAsync(
+                            "https://api.pushover.net/1/messages.json",
+                            new FormUrlEncodedContent(notification),
+                            cancellationToken);
 
-                    _logger.LogInformation("Notification pushed.");
+                        _logger.LogInformation("Notification pushed.");
+                    }
+                    else
+                    {
+                        _logger.LogDebug("Ignoring state change not in whitelist: {state}", printerStatus.Printer.State);
+                    }
 
                     lastPrinterState = printerStatus.Printer.State;
                 }
