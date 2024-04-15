@@ -49,6 +49,7 @@ namespace PrusaPushDispatcher
                 {
                     // TODO: better url builder
                     printerStatus = await printerClient.GetFromJsonAsync<PrinterStatus>($"{_settings.PrinterUrl}/api/v1/status", cancellationToken);
+                    failCount = 0;
                 }
                 catch (HttpRequestException)
                 {
