@@ -20,6 +20,11 @@ namespace PrusaPushDispatcher
         private readonly Settings _settings = settings.Value;
         private readonly ILogger<PrusaPushDispatcher> _logger = logger;
 
+        private static readonly HttpClient _pushoverClient = new HttpClient(new SocketsHttpHandler
+        {
+            PooledConnectionLifetime = TimeSpan.FromMinutes(5)
+        });
+
         protected override async Task ExecuteAsync(CancellationToken cancellationToken)
         {
             _logger.LogInformation("Starting application.");
@@ -31,11 +36,6 @@ namespace PrusaPushDispatcher
             {
                 PooledConnectionLifetime = TimeSpan.FromMinutes(5),
                 Credentials = new NetworkCredential(_settings.PrinterUsername, _settings.PrinterApiKey)
-            });
-
-            using var pushoverClient = new HttpClient(new SocketsHttpHandler
-            {
-                PooledConnectionLifetime = TimeSpan.FromMinutes(5)
             });
 
             var lastPoll = DateTimeOffset.Now;
@@ -66,20 +66,7 @@ namespace PrusaPushDispatcher
 
                     lastPrinterState = "UNRESPONSIVE";
 
-                    var notification = new Dictionary<string, string>
-                    {
-                        { "token", _settings.PushoverAppKey },
-                        { "user", _settings.PushoverUserKey },
-                        { "title", "Printer State" },
-                        { "message", "Printer not responding." }
-                    };
-
-                    await pushoverClient.PostAsync(
-                        "https://api.pushover.net/1/messages.json",
-                        new FormUrlEncodedContent(notification),
-                        cancellationToken);
-
-                    _logger.LogInformation("Notification pushed.");
+                    await PushNotification("Printer not responding.", cancellationToken);
                 }
                 
                 // tell me if status changed
@@ -89,21 +76,7 @@ namespace PrusaPushDispatcher
 
                     if (PrinterStateWhitelist.Contains(printerStatus.Printer.State))
                     {
-                        // TODO: customizable notification text
-                        var notification = new Dictionary<string, string>
-                        {
-                            { "token", _settings.PushoverAppKey },
-                            { "user", _settings.PushoverUserKey },
-                            { "title", "Prusa MK4" },
-                            { "message", $"Printer state is now: {printerStatus.Printer.State}" }
-                        };
-
-                        await pushoverClient.PostAsync(
-                            "https://api.pushover.net/1/messages.json",
-                            new FormUrlEncodedContent(notification),
-                            cancellationToken);
-
-                        _logger.LogInformation("Notification pushed.");
+                        await PushNotification($"Printer state is now: {printerStatus.Printer.State}", cancellationToken);
                     }
                     else
                     {
@@ -116,6 +89,32 @@ namespace PrusaPushDispatcher
                 lastPoll = DateTimeOffset.Now;
                 await Task.Delay(_settings.PollRateInSeconds * 1000, cancellationToken);
             }
+        }
+
+        private async Task PushNotification(string message, CancellationToken cancellationToken = default)
+        {
+            // TODO: customizable notification text
+            var notification = new Dictionary<string, string>
+            {
+                { "token", _settings.PushoverAppKey },
+                { "user", _settings.PushoverUserKey },
+                { "title", "Prusa MK4" },
+                { "message", message }
+            };
+
+            try
+            {
+                await _pushoverClient.PostAsync(
+                    "https://api.pushover.net/1/messages.json",
+                    new FormUrlEncodedContent(notification),
+                    cancellationToken);
+            }
+            catch
+            {
+
+            }
+
+            _logger.LogInformation("Notification pushed.");
         }
     }
 }
