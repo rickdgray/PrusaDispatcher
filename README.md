@@ -25,6 +25,13 @@ docker run -itd --restart unless-stopped \
 ghcr.io/rickdgray/prusapushdispatcher:main
 ```
 
+## Updating
+First kill any currently running containers. Then update your local docker image with the following command.
+```bash
+docker pull ghcr.io/rickdgray/prusapushdispatcher:main
+```
+Then you can run the deployment command above to start anew.
+
 ## Building
 Projects in .NET have an unusual folder structure, so when building we must both specify the context to be at the root of the solution, but also specify the location of the `dockerfile`.
 ```bash
