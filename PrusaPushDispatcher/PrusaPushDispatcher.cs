@@ -33,7 +33,10 @@ namespace PrusaPushDispatcher
                 Credentials = new NetworkCredential(_settings.PrinterUsername, _settings.PrinterApiKey)
             });
 
-            using var pushoverClient = new HttpClient();
+            using var pushoverClient = new HttpClient(new SocketsHttpHandler
+            {
+                PooledConnectionLifetime = TimeSpan.FromMinutes(5)
+            });
 
             var lastPoll = DateTimeOffset.Now;
             var lastPrinterState = "IDLE";
