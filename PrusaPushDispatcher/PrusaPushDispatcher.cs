@@ -109,9 +109,14 @@ namespace PrusaPushDispatcher
                     new FormUrlEncodedContent(notification),
                     cancellationToken);
             }
-            catch
+            catch (HttpRequestException)
             {
-
+                //TODO: retry logic
+            }
+            catch (TaskCanceledException ex)
+            {
+                //TODO: logging these for the time being for debugging
+                _logger.LogInformation(ex, "Task Cancelled Exception");
             }
 
             _logger.LogInformation("Notification pushed.");
